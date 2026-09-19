@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from w4h_fitbit_file_csv_importer.client import W4HClient
+from w4h_fitbit_csv_file_importer.client import W4HClient
 
 
 @pytest.mark.integration

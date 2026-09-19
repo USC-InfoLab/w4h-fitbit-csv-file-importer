@@ -25,9 +25,9 @@ against your own `manifest.yaml` without edits.
 
 Where the manifest and CSV files live
     W4H_DATA_DIR (see .env.example) is the folder holding the CSVs and their
-    reviewed `manifest.yaml` (`w4h-fitbit-file-csv-import plan` writes a draft).
-    For dev volume testing, point it at a sibling checkout, e.g.
-    `../w4h-sample-icde-demo-csv/data` — do not commit those CSVs into this repo.
+    reviewed `manifest.yaml` (`w4h-fitbit-csv-file-import plan` writes a draft).
+    For dev volume testing, point it at a *copy* of sibling
+    `../w4h-sample-fitbit-csv/data` — do not commit those CSVs into this repo.
     Without W4H_DATA_DIR the test plans the bundled `tests/fixtures/` CSVs into a
     temp folder, so the mapping builder itself is checked against the contract.
 
@@ -46,8 +46,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from w4h_fitbit_file_csv_importer.manifest import write_manifest
-from w4h_fitbit_file_csv_importer.mapping import plan_directory
+from w4h_fitbit_csv_file_importer.manifest import write_manifest
+from w4h_fitbit_csv_file_importer.mapping import plan_directory
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REQUIRED_TOP_LEVEL = ("vendor", "format", "version", "title", "signals")

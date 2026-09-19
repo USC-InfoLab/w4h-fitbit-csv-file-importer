@@ -24,11 +24,19 @@ _TIME_NAME_RE = re.compile(r"^(time|timestamp)$", re.I)
 
 
 def slug_from_filename(name: str) -> str:
-    """Drop Fitabase export suffixes (_merged, Narrow, Wide): heartrate_seconds_merged -> heartrate_seconds."""
+    """Drop Fitabase export suffixes (_merged, Narrow, Wide): heartrate_seconds_merged -> heartrate_seconds.
+
+    A leading `fitbit_` on the stem is the sample-package / export prefix, not the
+    signal — strip it so fitbit_heart_rate.csv maps to heart_rate (same slug the
+    catalogued Fitbit sample importer uses).
+    """
     stem = re.sub(r"\.[^./]+$", "", str(name or "")).lower()
     stem = re.sub(r"[_-]?merged$", "", stem)
     stem = re.sub(r"[_-]?(narrow|wide)$", "", stem)
-    return re.sub(r"[^a-z0-9]+", "_", stem).strip("_") or "signal"
+    stem = re.sub(r"[^a-z0-9]+", "_", stem).strip("_")
+    if stem.startswith("fitbit_"):
+        stem = stem[len("fitbit_") :]
+    return stem or "signal"
 
 
 def _is_subject(header: str) -> bool:
@@ -122,13 +130,24 @@ def build_manifest(profiles: list[dict]) -> dict:
     return manifest
 
 
+def plan_files(csv_files: list[Path]) -> dict:
+    """Profile the given CSVs (in list order) and return a draft manifest (nothing written)."""
+    paths = [Path(p) for p in csv_files]
+    missing = [str(p) for p in paths if not p.is_file()]
+    if missing:
+        raise FileNotFoundError("CSV file(s) not found:\n  " + "\n  ".join(missing))
+    if not paths:
+        raise FileNotFoundError("No .csv files to plan")
+    profiles = [profile_csv(p) for p in paths]
+    empty = [p["name"] for p in profiles if not p["headers"]]
+    if empty:
+        raise ValueError(f"Empty or headerless CSV file(s): {', '.join(empty)}")
+    return build_manifest(profiles)
+
+
 def plan_directory(data_dir: Path) -> dict:
     """Profile every *.csv in data_dir and return a draft manifest (nothing written)."""
     csv_files = sorted(Path(data_dir).glob("*.csv"))
     if not csv_files:
         raise FileNotFoundError(f"No .csv files found in {data_dir}")
-    profiles = [profile_csv(p) for p in csv_files]
-    empty = [p["name"] for p in profiles if not p["headers"]]
-    if empty:
-        raise ValueError(f"Empty or headerless CSV file(s): {', '.join(empty)}")
-    return build_manifest(profiles)
+    return plan_files(csv_files)

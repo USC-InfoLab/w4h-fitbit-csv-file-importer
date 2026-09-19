@@ -6,12 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from w4h_fitbit_file_csv_importer.__main__ import main
-from w4h_fitbit_file_csv_importer.csv_import import CHUNK_SIZE, import_all, import_signal
-from w4h_fitbit_file_csv_importer.manifest import load_manifest
-from w4h_fitbit_file_csv_importer.mapping import plan_directory, slug_from_filename
-from w4h_fitbit_file_csv_importer.profile import infer_type, profile_csv
-from w4h_fitbit_file_csv_importer.reconcile import reconcile_manifest
+from w4h_fitbit_csv_file_importer.__main__ import main
+from w4h_fitbit_csv_file_importer.csv_import import CHUNK_SIZE, import_all, import_signal
+from w4h_fitbit_csv_file_importer.manifest import load_manifest
+from w4h_fitbit_csv_file_importer.config import hardcoded_csv_paths
+from w4h_fitbit_csv_file_importer.mapping import plan_directory, plan_files, slug_from_filename
+from w4h_fitbit_csv_file_importer.profile import infer_type, profile_csv
+from w4h_fitbit_csv_file_importer.reconcile import reconcile_manifest
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -65,6 +66,19 @@ def test_slug_drops_fitabase_suffixes():
     assert slug_from_filename("heartrate_seconds_merged.csv") == "heartrate_seconds"
     assert slug_from_filename("minuteCaloriesNarrow_merged.csv") == "minutecalories"
     assert slug_from_filename("dailyActivity_merged.csv") == "dailyactivity"
+    assert slug_from_filename("fitbit_heart_rate.csv") == "heart_rate"
+    assert slug_from_filename("fitbit_subjects.csv") == "subjects"
+
+
+def test_hardcoded_sibling_files_plan_to_sample_slugs():
+    try:
+        paths = hardcoded_csv_paths()
+    except FileNotFoundError:
+        pytest.skip("sibling w4h-sample-fitbit-csv not checked out")
+    manifest = plan_files(paths)
+    assert {s["slug"] for s in manifest["signals"]} == {"subjects", "heart_rate", "calories", "weight"}
+    review = reconcile_manifest(manifest)
+    assert review["errors"] == []
 
 
 def test_plan_maps_fitabase_daily_activity(data_dir):
@@ -193,7 +207,7 @@ def test_validate_command_applies_corrections_and_reports_errors(data_dir, capsy
     manifest = load_manifest(data_dir)
     sig = _signal(manifest, "subjects")
     sig["geomts_mapping"]["subject"] = "nope"  # a bad hand edit
-    from w4h_fitbit_file_csv_importer.manifest import write_manifest
+    from w4h_fitbit_csv_file_importer.manifest import write_manifest
     write_manifest(data_dir, manifest)
     assert main(["validate", "--data-dir", str(data_dir)]) == 1
     plan = json.loads((data_dir / "plan.json").read_text())

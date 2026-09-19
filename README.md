@@ -1,4 +1,4 @@
-# W4H Fitbit File CSV Importer
+# W4H Fitbit CSV File Importer
 
 Notebook + CLI to import **Fitbit CSV files you supply** into W4H. Pick your own files (or point the CLI at a folder); the importer builds a GeoMTS mapping from their headers, lets you review it, and ingests them through the W4H API. No Fitbit API access needed. Credentials stay in a local `.env` (never committed).
 
@@ -14,7 +14,7 @@ Notebook + CLI to import **Fitbit CSV files you supply** into W4H. Pick your own
 
 ## How it works
 
-1. **Files** — one CSV per signal, with a header row, UTF-8, in one folder (`W4H_DATA_DIR`). In the notebook you choose them with a file selector; in the app the Admin uploads them.
+1. **Files** — one CSV per signal, with a header row, UTF-8. The **notebook** has a file chooser. **In-app Run / `./run.sh` do not use the notebook** — they call the CLI. When `W4H_DATA_DIR` is unset, the CLI loads the hardcoded sibling files in `w4h-sample-fitbit-csv/data/` (same package the catalogued Fitbit sample importer uses). When `W4H_DATA_DIR` is set, that folder is the source.
 2. **Plan (mapping)** — `plan` profiles each CSV locally (delimiter, headers and inferred column types incl. US dates and bigint ids — **never row values sent anywhere**), builds a GeoMTS mapping in this package (no API call, no AI key), runs the six deterministic checks, and writes `manifest.yaml` + `plan.json` next to the CSVs. **A human reviews and can edit the mapping before anything is imported.**
 3. **Import** — `import` refuses to run without the reviewed `manifest.yaml`, then streams rows in 500-row chunks to `POST /datasets/:id/import/csv-batch` with `table_prefix: "fitbit"`. Rows already loaded are skipped using the manifest's `dedupe_columns`. Progress is reported through `@@PROGRESS@@` lines for the in-app progress bar.
 
@@ -28,34 +28,36 @@ Notebook + CLI to import **Fitbit CSV files you supply** into W4H. Pick your own
 
 ## Dev testing with sibling sample data
 
-This repo holds **code only** — no production CSVs. For local end-to-end testing, clone the ICDE sample data package **next to** this repo and point `W4H_DATA_DIR` at its `data/` folder (same sibling pattern as [w4h-sample-icde-demo-csv-importer](https://github.com/USC-InfoLab/w4h-sample-icde-demo-csv-importer)):
+This repo holds **code only** — no production CSVs. Clone the Fitbit sample data package **next to** this repo (same sibling pattern as [w4h-sample-fitbit-csv-importer](https://github.com/USC-InfoLab/w4h-sample-fitbit-csv-importer)):
 
 ```
 W4H/
-  w4h-sample-icde-demo-csv/
+  w4h-sample-fitbit-csv/
   w4h-fitbit-csv-file-importer/
 ```
 
-```bash
-cp .env.example .env
-# In .env:
-#   W4H_DATA_DIR=../w4h-sample-icde-demo-csv/data
-#   W4H_API_KEY=w4h_sk_...
-#   W4H_DATASET_ID=my-fitbit-file-test   # empty throwaway dataset
+Hardcoded files (used by `./run.sh` / in-app Run when `W4H_DATA_DIR` is unset):
 
-./run.sh plan      # writes manifest.yaml next to the CSVs — review it
-./run.sh import
+```
+../w4h-sample-fitbit-csv/data/fitbit_subjects.csv
+../w4h-sample-fitbit-csv/data/fitbit_heart_rate.csv
+../w4h-sample-fitbit-csv/data/fitbit_calories.csv
+../w4h-sample-fitbit-csv/data/fitbit_weight.csv
 ```
 
-Use a **throwaway dataset** for this: the importer always sends `table_prefix: "fitbit"`, so ICDE-shaped files exercise mapping and chunk import but land in `fitbit_*` tables, not `icde_demo_*`.
+```bash
+cp .env.example .env   # API key + dataset id only — not file paths
+./run.sh import        # same entry the in-app Run button uses
+```
 
-`plan` writes `manifest.yaml` and `plan.json` **into** `W4H_DATA_DIR`. To avoid touching the canonical sample package, copy its `data/` folder to a working directory (e.g. `/tmp/icde-dev-data/`) and point `W4H_DATA_DIR` there instead.
+In-app Run injects `W4H_API_KEY` / `W4H_DATASET_ID`. It does not pass files yet; this stepping stone then loads the hardcoded list in `config.HARDCODED_CSV_FILES`. That plans the four files in memory (does not write `manifest.yaml` into the sample package) and ingests them with `table_prefix: "fitbit"`, so tables should match a dataset loaded by **Fitbit CSV importer**.
+
+The notebook is the user-file path (chooser). `--data-dir` is CLI-only if you want a local folder; do not put that in `.env` as the product contract.
 
 Unit tests keep using bundled `tests/fixtures/` (small, offline). To run the manifest contract against the sibling folder instead:
 
 ```bash
-export W4H_DATA_DIR=../w4h-sample-icde-demo-csv/data
-./run.sh plan   # once, if manifest.yaml is not there yet
+export W4H_DATA_DIR=/tmp/fitbit-dev-data   # copy of sample data/, if you planned it
 pytest tests/test_manifest_files.py -q
 ```
 
@@ -63,7 +65,7 @@ pytest tests/test_manifest_files.py -q
 
 ```bash
 cp .env.example .env
-# Edit .env — set W4H_API_KEY, W4H_DATASET_ID and W4H_DATA_DIR
+# Edit .env — W4H_API_KEY only
 ```
 
 Never commit `.env` or paste keys into notebook outputs.
@@ -76,14 +78,14 @@ pip install -e ".[dev,notebook]"
 
 ## Notebook (primary)
 
-Open [`notebook/import_fitbit_file_csv.ipynb`](notebook/import_fitbit_file_csv.ipynb) and run the cells in order: **pick files → review mapping → import**. The import cell offers `append` (safe to re-run) or `replace` (truncates each signal's table first — do not use on shared datasets).
+Open [`notebook/import_fitbit_csv_file.ipynb`](notebook/import_fitbit_csv_file.ipynb) and run the cells in order: **pick dataset (from the API) → pick files → review mapping → import**. The import cell offers `append` (safe to re-run) or `replace` (truncates each signal's table first — do not use on shared datasets). In-app Run does not use the notebook: the Admin creates the dataset in the app and the runner passes that id into `run.sh`.
 
 ## CLI (admins)
 
 ```bash
-w4h-fitbit-file-csv-import plan --data-dir /path/to/csvs      # draft mapping -> review manifest.yaml
+w4h-fitbit-csv-file-import plan --data-dir /path/to/csvs      # draft mapping -> review manifest.yaml
 export W4H_API_KEY=w4h_sk_...   # or use .env
-w4h-fitbit-file-csv-import import --dataset-id my-fitbit-data --data-dir /path/to/csvs --mode append
+w4h-fitbit-csv-file-import import --dataset-id my-fitbit-data --data-dir /path/to/csvs --mode append
 ```
 
 `--data-dir` defaults to `W4H_DATA_DIR`. `--mode replace` truncates each signal's table on its first batch.
@@ -95,18 +97,18 @@ w4h-fitbit-file-csv-import import --dataset-id my-fitbit-data --data-dir /path/t
 ./run.sh import          # or: ./run.sh sync --signal heart_rate --file ...
 ```
 
-Bootstraps a local `.venv`, installs this package, and runs the CLI. If `W4H_API_KEY` isn't already set in your environment, it prompts for it (and the API base URL) and offers to save both to `.env`. Set `W4H_API_KEY`/`W4H_API_BASE`/`W4H_DATASET_ID`/`W4H_DATA_DIR` beforehand to run non-interactively — this is the same entrypoint the in-app "Run" trigger uses.
+Bootstraps a local `.venv`, installs this package, and runs the CLI. If `W4H_API_KEY` isn't already set in your environment, it prompts for it (and the API base URL) and offers to save both to `.env`. The in-app Run trigger sets `W4H_API_KEY`/`W4H_API_BASE`/`W4H_DATASET_ID` in the process environment (not via this repo's `.env`).
 
 ## Incremental sync (cron)
 
 Append a new CSV for one signal (slug from `manifest.yaml`); rows already loaded are skipped:
 
 ```bash
-w4h-fitbit-file-csv-import sync --dataset-id my-fitbit-data --signal heart_rate --file /path/to/new_heart_rate.csv
+w4h-fitbit-csv-file-import sync --dataset-id my-fitbit-data --signal heart_rate --file /path/to/new_heart_rate.csv
 ```
 
 ```cron
-0 2 * * * cd /path/to/w4h-fitbit-file-csv-importer && ./run.sh sync --dataset-id my-fitbit-data --signal heart_rate --file /data/fitbit_heart_rate_delta.csv >> /var/log/w4h-fitbit-sync.log 2>&1
+0 2 * * * cd /path/to/w4h-fitbit-csv-file-importer && ./run.sh sync --dataset-id my-fitbit-data --signal heart_rate --file /data/fitbit_heart_rate_delta.csv >> /var/log/w4h-fitbit-sync.log 2>&1
 ```
 
 ## Tests

@@ -5,10 +5,11 @@
 #   - Manual mode: run it yourself in a terminal; if credentials aren't set and
 #     you're attached to a TTY, it prompts for them.
 #
-# Reads the CSV files from W4H_DATA_DIR (or --data-dir) and W4H_DATASET_ID (or --dataset-id).
+# In-app Run sets W4H_API_KEY / W4H_API_BASE / W4H_DATASET_ID in the process env.
+# This stepping stone then loads the hardcoded sibling CSVs (config.HARDCODED_CSV_FILES).
 #
 # Usage: ./run.sh [plan|plan|import|sync] [extra CLI args passed through to
-#   w4h-fitbit-file-csv-import]. Defaults to "import" with no extra args.
+#   w4h-fitbit-csv-file-import]. Defaults to "import" with no extra args.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -70,4 +71,4 @@ if [ ! -f "$VENV_DIR/.installed" ] || [ "$SCRIPT_DIR/pyproject.toml" -nt "$VENV_
 fi
 
 # --- run -----------------------------------------------------------------
-exec w4h-fitbit-file-csv-import "$MODE" "$@"
+exec w4h-fitbit-csv-file-import "$MODE" "$@"
