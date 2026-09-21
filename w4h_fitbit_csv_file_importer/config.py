@@ -1,4 +1,4 @@
-"""Load W4H_API_KEY and related settings from environment / .env (never committed)."""
+"""Load W4H_API_KEY from environment / .env (never committed)."""
 
 import os
 from pathlib import Path
@@ -13,9 +13,8 @@ VENDOR = "fitbit"
 # never collide with other vendors'. Sent in every csv-batch payload — do not drop it.
 TABLE_PREFIX = "fitbit"
 
-# Stepping-stone default for in-app Run / `./run.sh` when W4H_DATA_DIR is unset:
-# load the sibling Fitbit sample package (same files as w4h-sample-fitbit-csv-importer)
-# so results can be compared in the app. Do not copy those CSVs into this repo.
+# Stepping-stone files for in-app Run / ./run.sh (same package as the catalogued
+# Fitbit sample importer). Do not copy those CSVs into this repo.
 SIBLING_SAMPLE_REPO = "../w4h-sample-fitbit-csv"
 HARDCODED_CSV_FILES = (
     "data/fitbit_subjects.csv",
@@ -40,41 +39,22 @@ def api_base() -> str:
 
 
 def dataset_id() -> str:
+    """Id from the process environment (in-app Run). Empty if unset."""
     return os.environ.get("W4H_DATASET_ID", "").strip()
 
 
 def sibling_sample_root() -> Path:
-    raw = os.environ.get("W4H_SAMPLE_FITBIT_CSV_PATH", SIBLING_SAMPLE_REPO).strip()
-    p = Path(raw)
-    if not p.is_absolute():
-        p = (_PKG_ROOT / p).resolve()
-    return p
+    return (_PKG_ROOT / SIBLING_SAMPLE_REPO).resolve()
 
 
 def hardcoded_csv_paths() -> list[Path]:
-    """Resolved sibling sample CSVs used when W4H_DATA_DIR is unset (in-app Run)."""
+    """Sibling sample CSVs used by in-app Run / ./run.sh."""
     root = sibling_sample_root()
     paths = [(root / rel).resolve() for rel in HARDCODED_CSV_FILES]
     missing = [str(p) for p in paths if not p.is_file()]
     if missing:
         raise FileNotFoundError(
-            "Sibling Fitbit sample CSVs not found (clone w4h-sample-fitbit-csv next to "
-            f"this repo, or set W4H_SAMPLE_FITBIT_CSV_PATH / W4H_DATA_DIR):\n  "
-            + "\n  ".join(missing)
+            "Sibling Fitbit sample CSVs not found — clone w4h-sample-fitbit-csv "
+            "next to this repo:\n  " + "\n  ".join(missing)
         )
     return paths
-
-
-def data_dir_from_env() -> str:
-    return os.environ.get("W4H_DATA_DIR", "").strip()
-
-
-def data_dir() -> Path:
-    """Folder holding the CSV files (and, when set by the user, manifest.yaml)."""
-    raw = data_dir_from_env()
-    if raw:
-        p = Path(raw)
-        if not p.is_absolute():
-            p = (_PKG_ROOT / p).resolve()
-        return p
-    return hardcoded_csv_paths()[0].parent

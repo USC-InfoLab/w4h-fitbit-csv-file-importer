@@ -24,22 +24,17 @@ against your own `manifest.yaml` without edits.
                                  Every column referenced here must exist in `columns`.
 
 Where the manifest and CSV files live
-    W4H_DATA_DIR (see .env.example) is the folder holding the CSVs and their
-    reviewed `manifest.yaml` (`w4h-fitbit-csv-file-import plan` writes a draft).
-    For dev volume testing, point it at a *copy* of sibling
-    `../w4h-sample-fitbit-csv/data` — do not commit those CSVs into this repo.
-    Without W4H_DATA_DIR the test plans the bundled `tests/fixtures/` CSVs into a
-    temp folder, so the mapping builder itself is checked against the contract.
+    This test plans the bundled `tests/fixtures/` CSVs into a temp folder.
+    In-app Run uses `config.HARDCODED_CSV_FILES` (sibling sample package).
+    The notebook uses a file chooser.
 
 To create a new module
     1. Put your CSVs in a folder and write (or generate) a `manifest.yaml` following the contract.
-    2. Point W4H_DATA_DIR at that folder.
-    3. Run this file. Fix whatever it reports; each assertion message names the
-       signal and column at fault.
+    2. Run this file against that folder's mapping (or copy the fixture pattern).
+    3. Fix whatever it reports; each assertion message names the signal and column at fault.
 """
 
 import csv
-import os
 import shutil
 from pathlib import Path
 
@@ -56,13 +51,7 @@ REQUIRED_SIGNAL_KEYS = ("slug", "file", "columns", "geomts_mapping")
 
 @pytest.fixture(scope="module")
 def data_root(tmp_path_factory):
-    """Folder holding the CSVs and manifest.yaml: W4H_DATA_DIR, else the planned test fixtures."""
-    raw = os.environ.get("W4H_DATA_DIR", "").strip()
-    if raw:
-        root = Path(raw).expanduser().resolve()
-        if not root.is_dir():
-            pytest.fail(f"W4H_DATA_DIR {root} is not a directory")
-        return root
+    """Plan the bundled test fixtures into a temp folder."""
     root = tmp_path_factory.mktemp("planned")
     for f in (REPO_ROOT / "tests" / "fixtures").glob("*.csv"):
         shutil.copy(f, root / f.name)

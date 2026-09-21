@@ -14,7 +14,7 @@ Notebook + CLI to import **Fitbit CSV files you supply** into W4H. Pick your own
 
 ## How it works
 
-1. **Files** — one CSV per signal, with a header row, UTF-8. The **notebook** has a file chooser. **In-app Run / `./run.sh` do not use the notebook** — they call the CLI. When `W4H_DATA_DIR` is unset, the CLI loads the hardcoded sibling files in `w4h-sample-fitbit-csv/data/` (same package the catalogued Fitbit sample importer uses). When `W4H_DATA_DIR` is set, that folder is the source.
+1. **Files** — one CSV per signal, with a header row, UTF-8. The **notebook** has a file chooser. **In-app Run / `./run.sh` do not use the notebook** — they call the CLI and load the hardcoded sibling files in `config.HARDCODED_CSV_FILES`.
 2. **Plan (mapping)** — `plan` profiles each CSV locally (delimiter, headers and inferred column types incl. US dates and bigint ids — **never row values sent anywhere**), builds a GeoMTS mapping in this package (no API call, no AI key), runs the six deterministic checks, and writes `manifest.yaml` + `plan.json` next to the CSVs. **A human reviews and can edit the mapping before anything is imported.**
 3. **Import** — `import` refuses to run without the reviewed `manifest.yaml`, then streams rows in 500-row chunks to `POST /datasets/:id/import/csv-batch` with `table_prefix: "fitbit"`. Rows already loaded are skipped using the manifest's `dedupe_columns`. Progress is reported through `@@PROGRESS@@` lines for the in-app progress bar.
 
@@ -36,7 +36,7 @@ W4H/
   w4h-fitbit-csv-file-importer/
 ```
 
-Hardcoded files (used by `./run.sh` / in-app Run when `W4H_DATA_DIR` is unset):
+Hardcoded files (used by `./run.sh` / in-app Run):
 
 ```
 ../w4h-sample-fitbit-csv/data/fitbit_subjects.csv
@@ -52,14 +52,9 @@ cp .env.example .env   # API key + dataset id only — not file paths
 
 In-app Run injects `W4H_API_KEY` / `W4H_DATASET_ID`. It does not pass files yet; this stepping stone then loads the hardcoded list in `config.HARDCODED_CSV_FILES`. That plans the four files in memory (does not write `manifest.yaml` into the sample package) and ingests them with `table_prefix: "fitbit"`, so tables should match a dataset loaded by **Fitbit CSV importer**.
 
-The notebook is the user-file path (chooser). `--data-dir` is CLI-only if you want a local folder; do not put that in `.env` as the product contract.
+The notebook is the user-file path (chooser). `--data-dir` is CLI-only if you want a local folder.
 
-Unit tests keep using bundled `tests/fixtures/` (small, offline). To run the manifest contract against the sibling folder instead:
-
-```bash
-export W4H_DATA_DIR=/tmp/fitbit-dev-data   # copy of sample data/, if you planned it
-pytest tests/test_manifest_files.py -q
-```
+Unit tests use bundled `tests/fixtures/` (small, offline).
 
 ## Credentials
 
@@ -88,7 +83,7 @@ export W4H_API_KEY=w4h_sk_...   # or use .env
 w4h-fitbit-csv-file-import import --dataset-id my-fitbit-data --data-dir /path/to/csvs --mode append
 ```
 
-`--data-dir` defaults to `W4H_DATA_DIR`. `--mode replace` truncates each signal's table on its first batch.
+`--data-dir` is optional (default: hardcoded sibling files). `--mode replace` truncates each signal's table on its first batch.
 
 ## One-command run (`run.sh`)
 
@@ -119,7 +114,7 @@ pytest tests/test_manifest_files.py -q      # just the manifest/CSV contract che
 ```
 
 - [`tests/test_importer.py`](tests/test_importer.py) — profiling, mapping (Fitabase-style US dates, bigint ids, geo, subjects), the six reconcile checks, and chunked import against a fake client. Fixtures in `tests/fixtures/`.
-- [`tests/test_manifest_files.py`](tests/test_manifest_files.py) — verifies a `manifest.yaml` (in `W4H_DATA_DIR`, else one planned from the fixtures) and that every CSV it lists exists with a matching header. Its docstring documents the module contract and how to create a new module; copy it as a template.
+- [`tests/test_manifest_files.py`](tests/test_manifest_files.py) — verifies a `manifest.yaml` planned from `tests/fixtures/` and that every CSV it lists exists with a matching header. Its docstring documents the module contract; copy it as a template.
 - Optional API test, needs a running w4h-api:
 
 ```bash
