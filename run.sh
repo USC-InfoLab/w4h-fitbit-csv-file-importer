@@ -6,7 +6,8 @@
 #     you're attached to a TTY, it prompts for them.
 #
 # In-app Run sets W4H_API_KEY / W4H_API_BASE / W4H_DATASET_ID in the process env.
-# This stepping stone then loads the hardcoded sibling CSVs (config.HARDCODED_CSV_FILES).
+# This then loads the live sample declared in contribution.yaml (sibling
+# w4h-sample-fitbit-csv files, or tests/fixtures if that checkout is missing).
 #
 # Usage: ./run.sh [plan|plan|import|sync] [extra CLI args passed through to
 #   w4h-fitbit-csv-file-import]. Defaults to "import" with no extra args.

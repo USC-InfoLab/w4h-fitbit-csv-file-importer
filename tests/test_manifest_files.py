@@ -24,12 +24,12 @@ against your own `manifest.yaml` without edits.
                                  Every column referenced here must exist in `columns`.
 
 Where the manifest and CSV files live
-    This test plans the bundled `tests/fixtures/` CSVs into a temp folder.
-    In-app Run uses `config.HARDCODED_CSV_FILES` (sibling sample package).
-    The notebook uses a file chooser.
+    Automated tests plan the bundled `tests/fixtures/` CSVs (see contribution.yaml).
+    In-app Run / `./run.sh` use `tests.live.sample` (sibling W4H sample repo, or
+    fixture fallback). The notebook uses a file chooser.
 
 To create a new module
-    1. Put your CSVs in a folder and write (or generate) a `manifest.yaml` following the contract.
+    1. Put stripped CSVs in `tests/fixtures/` and declare them in contribution.yaml.
     2. Run this file against that folder's mapping (or copy the fixture pattern).
     3. Fix whatever it reports; each assertion message names the signal and column at fault.
 """

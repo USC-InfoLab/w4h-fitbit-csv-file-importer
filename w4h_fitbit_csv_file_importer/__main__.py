@@ -1,6 +1,6 @@
 """CLI entry: w4h-fitbit-csv-file-import
 
-  plan      profile CSVs (hardcoded sibling list, or --data-dir)
+  plan      profile CSVs (contribution.yaml live sample, or --data-dir)
   validate  re-check a reviewed manifest.yaml next to --data-dir
   import    load every CSV
   sync      append one CSV for one signal
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .client import W4HClient
 from .config import dataset_id as env_dataset_id
-from .config import hardcoded_csv_paths
+from .contribution import live_sample_paths
 from .csv_import import import_all, import_signal
 from .manifest import load_manifest, signal_by_slug, write_manifest, write_plan
 from .mapping import plan_directory, plan_files
@@ -39,13 +39,14 @@ def _print_plan(manifest: dict, review: dict) -> None:
 def _resolve_sources(args) -> tuple[Path, dict, bool]:
     """Return (data_dir, planned_manifest_or_None, write_sidecar).
 
-    Default: hardcoded sibling CSVs, planned in memory (in-app Run).
+    Default: contribution.yaml live sample (sibling W4H dataset files, or
+    in-repo fixtures), planned in memory (in-app Run).
     --data-dir: that folder + reviewed-manifest flow.
     """
     if getattr(args, "data_dir", None):
         return Path(args.data_dir).resolve(), None, True
-    paths = hardcoded_csv_paths()
-    print("Using hardcoded sibling sample CSVs:")
+    source, paths = live_sample_paths()
+    print(f"Using live sample from contribution.yaml ({source}):")
     for p in paths:
         print(f"  {p}")
     return paths[0].parent, plan_files(paths), False
@@ -60,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     def common(p, needs_dataset=True):
         if needs_dataset:
             p.add_argument("--dataset-id", default=env_dataset_id(), help="Target catalog dataset id")
-        p.add_argument("--data-dir", help="Optional folder of CSVs (default: hardcoded sibling sample files)")
+        p.add_argument("--data-dir", help="Optional folder of CSVs (default: contribution.yaml live sample)")
 
     common(sub.add_parser("plan", help="Build a draft mapping for review"), False)
     common(sub.add_parser("validate", help="Re-check manifest.yaml in --data-dir"), False)
