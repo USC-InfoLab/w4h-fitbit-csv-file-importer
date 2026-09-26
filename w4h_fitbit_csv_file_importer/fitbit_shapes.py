@@ -55,3 +55,17 @@ def matched_shape(headers: list[str]) -> str | None:
         if len(cols & canon) / len(cols) >= SHAPE_MIN_OVERLAP:
             return name
     return None
+
+
+_GENERIC = {"id", "date", "time", "timestamp", "value"}
+_FITBIT_COLS = set().union(*SHAPES.values()) - _GENERIC
+
+
+def is_fitbit(headers: list[str]) -> bool:
+    """Looser than matched_shape: a known shape, or an Id column plus any Fitbit-specific header.
+
+    Deliberately not stricter: headers cannot tell Fitbit from other datasets that share the generic
+    id/date/timestamp/value layout (ICDE demo files pass), and Fitabase Wide files pass too.
+    """
+    canon = {canonicalize_header(h) for h in headers}
+    return matched_shape(headers) is not None or ("id" in canon and bool(canon & _FITBIT_COLS))

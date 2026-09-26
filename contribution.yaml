@@ -1,9 +1,6 @@
-# Test contract + live-run sample for this module.
-# Automated tests use tiny in-repo fixtures. In-app Run / ./run.sh use an
-# existing W4H sample repo when it is checked out next to this one
-# (w4h-sample-fitbit-csv). If that sibling is missing, live run falls back
-# to the same fixtures. Other ingest modules can point live.sample.repo at
-# w4h-sample-icde-demo-csv the same way.
+# Test contract for this module. Automated tests use tiny in-repo fixtures. In-app
+# Run and ./run.sh import take the Admin's files: uploaded (W4H_DATA_DIR) or a folder
+# (--data-dir). There is no bundled sample run.
 
 slug: w4h-fitbit-csv-file-importer
 kind: ingest
@@ -11,28 +8,14 @@ publisher: usc-infolab
 
 tests:
   automated:
-    command: pytest tests/ -q -m "not integration"
+    command: pytest tests/ -q -m "not integration and not kaggle"
     sample:
       kind: fixtures
       path: tests/fixtures
 
-  live:
-    command: ./run.sh import
-    sample:
-      kind: sibling
-      repo: w4h-sample-fitbit-csv
-      files:
-        - data/fitbit_subjects.csv
-        - data/fitbit_heart_rate.csv
-        - data/fitbit_calories.csv
-        - data/fitbit_weight.csv
-      fallback:
-        kind: fixtures
-        path: tests/fixtures
-
 # Form contract. dataset_id is injected by in-app Run as W4H_DATASET_ID.
-# Optional files: pass --data-dir (CLI / notebook chooser). Other fields are
-# defaults testers can override once the Run dialog reads this file.
+# Files: in-app Run passes the Admin's upload as W4H_DATA_DIR; the CLI takes --data-dir (subfolders
+# included) and the notebook has a file chooser. Other fields are defaults testers can override.
 inputs:
   - key: dataset_id
     type: dataset

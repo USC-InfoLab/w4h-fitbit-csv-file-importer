@@ -1,4 +1,4 @@
-"""Load contribution.yaml and resolve automated / live sample files."""
+"""Load contribution.yaml and resolve the automated (fixture) sample files."""
 
 from pathlib import Path
 
@@ -38,18 +38,6 @@ def _fixture_paths(spec: dict, root: Path) -> list[Path]:
     return paths
 
 
-def _sibling_paths(spec: dict, root: Path) -> list[Path] | None:
-    repo = spec.get("repo")
-    files = spec.get("files") or []
-    if not repo or not files:
-        return None
-    sibling = (root.parent / repo).resolve()
-    paths = [(sibling / rel).resolve() for rel in files]
-    if all(p.is_file() for p in paths):
-        return paths
-    return None
-
-
 def automated_sample_paths(root: Path | None = None) -> list[Path]:
     """Tiny in-repo fixtures for pytest (no network, no sibling checkout)."""
     pkg = root or _PKG_ROOT
@@ -58,28 +46,3 @@ def automated_sample_paths(root: Path | None = None) -> list[Path]:
     if sample.get("kind") != "fixtures":
         raise ValueError("tests.automated.sample.kind must be 'fixtures'")
     return _fixture_paths(sample, pkg)
-
-
-def live_sample_paths(root: Path | None = None) -> tuple[str, list[Path]]:
-    """Files for in-app Run / ./run.sh.
-
-    Prefers the sibling W4H sample repo declared in yaml; falls back to
-    in-repo fixtures when that checkout is missing.
-    """
-    pkg = root or _PKG_ROOT
-    spec = ((load_contribution(pkg).get("tests") or {}).get("live") or {}).get("sample") or {}
-    kind = spec.get("kind")
-    if kind == "sibling":
-        paths = _sibling_paths(spec, pkg)
-        if paths:
-            return spec["repo"], paths
-        fallback = spec.get("fallback") or {"kind": "fixtures", "path": "tests/fixtures"}
-        if fallback.get("kind") == "fixtures":
-            return "fixtures", _fixture_paths(fallback, pkg)
-        raise FileNotFoundError(
-            f"Sibling sample {spec.get('repo')!r} not found — clone it next to this repo, "
-            "or keep tests/fixtures as fallback."
-        )
-    if kind == "fixtures":
-        return "fixtures", _fixture_paths(spec, pkg)
-    raise ValueError("tests.live.sample.kind must be 'sibling' or 'fixtures'")

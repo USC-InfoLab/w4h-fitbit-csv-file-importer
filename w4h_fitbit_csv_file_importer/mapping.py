@@ -6,6 +6,7 @@ the time axis; a lone full timestamp/date is the axis; lat/lon pair is geo; rema
 numeric columns are values (none when there is no time axis); dedupe covers subject + time.
 """
 
+import os
 import re
 from pathlib import Path
 
@@ -97,7 +98,7 @@ def build_signal(profile: dict) -> dict:
         ]
     )
 
-    slug = slug_from_filename(profile["name"])
+    slug = slug_from_filename(Path(profile["name"]).name)
     mapping = {"signal_type": slug, "subject": subject, "time": time, "values": values}
     if geo:
         mapping["geo"] = geo
@@ -130,8 +131,71 @@ def build_manifest(profiles: list[dict]) -> dict:
     return manifest
 
 
-def plan_files(csv_files: list[Path]) -> dict:
-    """Profile the given CSVs (in list order) and return a draft manifest (nothing written)."""
+MAX_DEPTH = 5  # subfolder levels below the root; also stops symlink loops
+
+
+def find_csvs(root: Path) -> tuple[list[Path], list[tuple[str, str]]]:
+    """Every .csv under root, walking subfolders and following symlinks that stay inside root.
+
+    Returns (paths, problems); problems are (reason, relative path) for links that leave the
+    folder or point nowhere, subfolders that cannot be read, and subfolders below MAX_DEPTH.
+    Dot-files and dot-folders (the API's .owner.json / .<name>.part) and non-.csv files are
+    ignored. Links back to an enclosing folder are skipped, and a file reachable through several
+    links is listed once, under its real path.
+    """
+    root = Path(root).resolve()
+    paths: list[Path] = []
+    problems: list[tuple[str, str]] = []
+    if not os.access(root, os.R_OK | os.X_OK):
+        problems.append(("Unreadable folder", "."))
+        return paths, problems
+
+    def unreadable(err: OSError) -> None:
+        problems.append(("Unreadable folder", Path(err.filename).relative_to(root).as_posix()))
+
+    def inside(p: Path) -> bool:
+        return p.resolve().is_relative_to(root)
+
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=True, onerror=unreadable):
+        here = Path(dirpath)
+        rel_dir = here.relative_to(root)
+        keep = []
+        for d in sorted(dirnames):
+            rel = (rel_dir / d).as_posix()
+            if d.startswith("."):
+                continue
+            target = (here / d).resolve()
+            if target in (here.resolve(), *here.resolve().parents):
+                continue  # link back to a folder already being walked: nothing new to read
+            if not inside(here / d):
+                problems.append(("Link leaves the folder", rel))
+            elif len(rel_dir.parts) + 1 > MAX_DEPTH:
+                problems.append((f"Deeper than {MAX_DEPTH} folders", rel))
+            else:
+                keep.append(d)
+        dirnames[:] = keep
+        for name in sorted(filenames):
+            p = here / name
+            if name.startswith(".") or p.suffix.lower() != ".csv":
+                continue
+            rel = p.relative_to(root).as_posix()
+            if not p.exists():
+                problems.append(("Broken link", rel))
+            elif not inside(p):
+                problems.append(("Link leaves the folder", rel))
+            else:
+                paths.append(p)
+    once: dict[Path, Path] = {}
+    for p in paths:  # same file behind several links: keep the non-link path
+        once[p.resolve()] = p if p == p.resolve() else once.get(p.resolve(), p)
+    return [once.pop(p.resolve()) for p in paths if p.resolve() in once], problems
+
+
+def plan_files(csv_files: list[Path], root: Path | None = None) -> dict:
+    """Profile the given CSVs (in list order) and return a draft manifest (nothing written).
+
+    With `root`, each signal's `file` is the path relative to it (files may live in subfolders).
+    """
     paths = [Path(p) for p in csv_files]
     missing = [str(p) for p in paths if not p.is_file()]
     if missing:
@@ -139,6 +203,9 @@ def plan_files(csv_files: list[Path]) -> dict:
     if not paths:
         raise FileNotFoundError("No .csv files to plan")
     profiles = [profile_csv(p) for p in paths]
+    if root is not None:
+        for prof, p in zip(profiles, paths):
+            prof["name"] = p.relative_to(Path(root).resolve()).as_posix()
     empty = [p["name"] for p in profiles if not p["headers"]]
     if empty:
         raise ValueError(f"Empty or headerless CSV file(s): {', '.join(empty)}")
@@ -146,8 +213,10 @@ def plan_files(csv_files: list[Path]) -> dict:
 
 
 def plan_directory(data_dir: Path) -> dict:
-    """Profile every *.csv in data_dir and return a draft manifest (nothing written)."""
-    csv_files = sorted(Path(data_dir).glob("*.csv"))
+    """Profile every .csv under data_dir (subfolders included) and return a draft manifest (nothing written)."""
+    csv_files, problems = find_csvs(data_dir)
+    if problems:
+        raise ValueError("; ".join(f"{why}: {rel}" for why, rel in problems))
     if not csv_files:
         raise FileNotFoundError(f"No .csv files found in {data_dir}")
-    return plan_files(csv_files)
+    return plan_files(csv_files, root=Path(data_dir))

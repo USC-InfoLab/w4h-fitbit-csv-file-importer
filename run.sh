@@ -6,11 +6,10 @@
 #     you're attached to a TTY, it prompts for them.
 #
 # In-app Run sets W4H_API_KEY / W4H_API_BASE / W4H_DATASET_ID in the process env.
-# This then loads the live sample declared in contribution.yaml (sibling
-# w4h-sample-fitbit-csv files, or tests/fixtures if that checkout is missing).
+# Files come from W4H_DATA_DIR (the Admin's upload) or --data-dir; there is no sample run.
 #
-# Usage: ./run.sh [plan|plan|import|sync] [extra CLI args passed through to
-#   w4h-fitbit-csv-file-import]. Defaults to "import" with no extra args.
+# Usage: ./run.sh [plan|validate|import|sync] [extra CLI args passed through to
+#   w4h-fitbit-csv-file-import]. Defaults to "import"; it needs --data-dir or W4H_DATA_DIR.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +17,7 @@ cd "$SCRIPT_DIR"
 
 MODE="${1:-import}"
 if [ "$MODE" != "import" ] && [ "$MODE" != "sync" ] && [ "$MODE" != "plan" ] && [ "$MODE" != "validate" ]; then
-  echo "Usage: $0 [plan|plan|import|sync] [extra CLI args]" >&2
+  echo "Usage: $0 [plan|validate|import|sync] [extra CLI args]" >&2
   exit 1
 fi
 shift || true
