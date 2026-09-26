@@ -20,6 +20,7 @@ w4h-fitbit-csv-file-import = "w4h_fitbit_csv_file_importer.__main__:main"
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 notebook = ["ipywidgets>=8"]
+kaggle = ["kaggle>=1.6"]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -27,4 +28,8 @@ include = ["w4h_fitbit_csv_file_importer*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["integration: needs a running w4h-api and W4H_API_KEY"]
+addopts = "-m 'not kaggle'"  # Kaggle tests need credentials + network; run with -m kaggle
+markers = [
+  "integration: needs a running w4h-api and W4H_API_KEY",
+  "kaggle: needs Kaggle credentials and the kaggle package",
+]

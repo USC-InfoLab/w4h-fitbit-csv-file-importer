@@ -31,9 +31,10 @@ Notebook + CLI to import **Fitbit CSV files you supply** into W4H. Pick your own
 This repo holds **code only** — no production CSVs. Automated tests use the small bundled `tests/fixtures/` (offline).
 
 ```bash
-cp .env.example .env   # API key + dataset id only — not file paths
-pytest tests/ -q -m "not integration"   # required automated tests (tiny fixtures)
-./run.sh import        # same entry the in-app Run button uses
+cp .env.example .env   # API key and base URL only — not file paths
+pytest tests/ -q -m "not integration and not kaggle"   # required automated tests (tiny fixtures)
+./run.sh plan --data-dir /path/to/csvs                  # then review manifest.yaml
+./run.sh import --dataset-id my-fitbit-data --data-dir /path/to/csvs
 ```
 
 In-app Run injects `W4H_API_KEY` / `W4H_API_BASE` / `W4H_DATASET_ID`, plus `W4H_DATA_DIR` for the Admin's uploaded files. With neither `--data-dir` nor `W4H_DATA_DIR` the CLI stops and says so. `--data-dir` is the reviewed-manifest flow (`plan`, edit `manifest.yaml`, `import`); `W4H_DATA_DIR` plans in memory and writes no manifest. Rows go in with `table_prefix: "fitbit"`.
@@ -97,13 +98,14 @@ w4h-fitbit-csv-file-import sync --dataset-id my-fitbit-data --data-dir /path/to/
 ## Tests
 
 ```bash
-pytest tests/ -q                            # unit tests + module contract check (no network)
+pytest tests/ -q -m "not integration and not kaggle"   # unit tests + module contract check (no network)
 pytest tests/test_manifest_files.py -q      # just the manifest/CSV contract check
 ```
 
 - [`tests/test_contribution_yaml.py`](tests/test_contribution_yaml.py) — `contribution.yaml` has the required keys; the automated sample is `tests/fixtures/`.
 - [`tests/test_importer.py`](tests/test_importer.py) — profiling, mapping (Fitabase-style US dates, bigint ids, geo, subjects), the six reconcile checks, and chunked import against a fake client. Fixtures in `tests/fixtures/`.
 - [`tests/test_manifest_files.py`](tests/test_manifest_files.py) — verifies a `manifest.yaml` planned from `tests/fixtures/` and that every CSV it lists exists with a matching header. Its docstring documents the module contract; copy it as a template.
+- [`tests/test_kaggle_fitbit.py`](tests/test_kaggle_fitbit.py) (`kaggle`) — plans + reconciles the real Kaggle `arashnic/fitbit` export; needs `~/.kaggle/kaggle.json` (or `KAGGLE_USERNAME`/`KAGGLE_KEY`) and `pip install -e ".[kaggle]"`. Run: `pytest tests/test_kaggle_fitbit.py -m kaggle -q`.
 - Optional API test, needs a running w4h-api:
 
 ```bash
