@@ -73,4 +73,5 @@ def profile_csv(path: Path) -> dict:
         "delimiter": delimiter,
         "headers": headers,
         "inferred_types": inferred,
+        "rows_seen": len(preview),
     }

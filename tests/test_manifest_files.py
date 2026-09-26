@@ -25,8 +25,8 @@ against your own `manifest.yaml` without edits.
 
 Where the manifest and CSV files live
     Automated tests plan the bundled `tests/fixtures/` CSVs (see contribution.yaml).
-    In-app Run / `./run.sh` use `tests.live.sample` (sibling W4H sample repo, or
-    fixture fallback). The notebook uses a file chooser.
+    In-app Run / `./run.sh` use the Admin's files (`W4H_DATA_DIR` upload or `--data-dir`).
+    The notebook uses a file chooser.
 
 To create a new module
     1. Put stripped CSVs in `tests/fixtures/` and declare them in contribution.yaml.

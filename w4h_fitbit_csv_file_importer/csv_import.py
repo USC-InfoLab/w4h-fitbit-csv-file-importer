@@ -37,6 +37,25 @@ def count_csv_rows(csv_path: Path) -> int:
         return max(sum(1 for line in f if line.strip()) - 1, 0)
 
 
+def _signal_path(signal: dict, data_dir: Path) -> Path:
+    """The signal's CSV (manifest `file` is relative to data_dir); refuses paths that leave it."""
+    root = Path(data_dir).resolve()
+    path = (root / signal["file"]).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError(f"{signal['slug']}: file {signal['file']!r} is outside the data folder")
+    if not path.is_file():
+        raise FileNotFoundError(f"CSV missing for signal {signal['slug']!r}: {path}")
+    return path
+
+
+def _total_rows(csv_path: Path, label: str) -> int:
+    """Row count for progress; a file that cannot be read in full stops the run before any POST."""
+    try:
+        return count_csv_rows(csv_path)
+    except (OSError, UnicodeDecodeError) as e:
+        raise SystemExit(f"Unreadable ({type(e).__name__}): {label}") from e
+
+
 def import_signal(
     client: W4HClient,
     dataset_id: str,
@@ -46,16 +65,15 @@ def import_signal(
     csv_path: Path | None = None,
     signal_index: int = 1,
     signal_count: int = 1,
+    total_rows: int | None = None,
 ) -> dict:
     slug = signal["slug"]
-    csv_path = (csv_path or Path(data_dir) / Path(signal["file"]).name).resolve()
+    csv_path = Path(csv_path).resolve() if csv_path else _signal_path(signal, data_dir)
     if not csv_path.is_file():
         raise FileNotFoundError(f"CSV missing for signal {slug!r}: {csv_path}")
 
-    try:
-        total_rows = count_csv_rows(csv_path)
-    except (OSError, csv.Error, UnicodeDecodeError):
-        total_rows = None  # progress is cosmetic; don't fail the import over it
+    if total_rows is None:
+        total_rows = _total_rows(csv_path, signal["file"])
     total_chunks = -(-total_rows // CHUNK_SIZE) if total_rows else None
 
     mapping = dict(signal.get("geomts_mapping") or {})
@@ -118,9 +136,12 @@ def import_all(
     client: W4HClient, dataset_id: str, manifest: dict, data_dir: Path, mode: str = "append"
 ) -> list[dict]:
     signals = manifest.get("signals", [])
+    # Count every file first: a non-UTF-8 file aborts before any signal is posted, not halfway through.
+    totals = [_total_rows(_signal_path(s, data_dir), s["file"]) for s in signals]
     return [
         import_signal(
-            client, dataset_id, signal, data_dir, mode=mode, signal_index=i, signal_count=len(signals)
+            client, dataset_id, signal, data_dir, mode=mode,
+            signal_index=i, signal_count=len(signals), total_rows=totals[i - 1],
         )
         for i, signal in enumerate(signals, start=1)
     ]
