@@ -44,3 +44,4 @@ inputs:
   - key: files
     type: files
     required: false
+    summary: A Fitbit account CSV export you downloaded.
