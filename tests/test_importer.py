@@ -203,3 +203,23 @@ def test_validate_command_applies_corrections_and_reports_errors(data_dir, capsy
     sig["geomts_mapping"]["subject"] = "id"
     write_manifest(data_dir, manifest)
     assert main(["validate", "--data-dir", str(data_dir)]) == 0
+
+
+def test_plan_and_import_a_dropped_folder(tmp_path_factory, data_dir):
+    """In-app folder drop keeps the folder in each name: plan and import it like a flat upload."""
+    wrapped = tmp_path_factory.mktemp("drop")
+    sub = wrapped / "Fitabase Data (1) 4.12.16"
+    sub.mkdir(parents=True)
+    for f in FIXTURES.glob("*.csv"):
+        shutil.copy(f, sub / f.name)
+    (wrapped / ".hidden").mkdir()
+    shutil.copy(FIXTURES / "subjects.csv", wrapped / ".hidden" / "subjects.csv")
+
+    flat = plan_directory(data_dir)
+    nested = plan_directory(wrapped)
+    assert sorted(s["slug"] for s in nested["signals"]) == sorted(s["slug"] for s in flat["signals"])
+    assert all(s["file"].startswith("Fitabase Data (1) 4.12.16/") for s in nested["signals"])
+
+    client = FakeClient()
+    results = import_all(client, "d1", nested, wrapped)
+    assert len(results) == len(flat["signals"]) and client.imports
